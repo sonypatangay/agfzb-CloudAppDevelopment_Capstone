@@ -29,12 +29,29 @@ def contact(request):
     if request.method == "GET":
         return render(request, 'djangoapp/contact.html', context)
 # Create a `login_request` view to handle sign in request
-# def login_request(request):
-# ...
+def login_request(request):
+    context = {}
+    if request.method == "POST":
+        username = request.POST['username']
+        password = request.POST['psw']
+        user = authenticate(username=username, password=password)
+        if user is not None:
+            login(request, user)
+            return redirect('djangoapp:index')
+        else:
+            context['message'] = "Invalid username or password."
+            return render(request, 'djangoapp/login.html', context)
+    else:
+        return render(request, 'djangoapp/login.html', context)
 
 # Create a `logout_request` view to handle sign out request
-# def logout_request(request):
-# ...
+def logout_request(request):
+    # Get the user object based on session id in request
+    print("Logging out `{}`...".format(request.user.username))
+    # Logout user in the request
+    logout(request)
+    # Redirect user back to course list view
+    return redirect('djangoapp:index')
 
 # Create a `registration_request` view to handle sign up request
 # def registration_request(request):
