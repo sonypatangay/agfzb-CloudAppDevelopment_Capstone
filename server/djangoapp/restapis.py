@@ -1,15 +1,17 @@
 import requests
 import json
 import os
-# import related models here
+from decouple import config
+from .models import CarDealer, DealerReview
 from requests.auth import HTTPBasicAuth
+from ibm_watson import NaturalLanguageUnderstandingV1
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
-from .models import CarDealer
+from ibm_watson.natural_language_understanding_v1 import Features, SentimentOptions
 # Create a `get_request` to make HTTP GET requests
 # e.g., response = requests.get(url, params=params, headers={'Content-Type': 'application/json'},
 #                                     auth=HTTPBasicAuth('apikey', api_key))
 # - Parse JSON results into a CarDealer object list
-def get_request(url, api_key, **kwargs):
+def get_request(url, api_key="13dVXn-QWMy9nxIQGmSkUTszLcYXU_1vIxVEH_pqKiV2", **kwargs):
     print(f"GET from {url}")
     if api_key:
         # Basic authentication GET
@@ -73,9 +75,9 @@ def get_dealers_from_cf(url):
 def get_dealer_by_id(url, dealer_id):
     # Call get_request with the dealer_id param
     json_result = get_request(url, dealerId=dealer_id)
-
+    print(f"json_here {json_result}")
     # Create a CarDealer object from response
-    dealer = json_result["entries"][0]
+    dealer = json_result
     dealer_obj = CarDealer(address=dealer["address"], city=dealer["city"], full_name=dealer["full_name"],
                            id=dealer["id"], lat=dealer["lat"], long=dealer["long"],
                            short_name=dealer["short_name"],
@@ -89,7 +91,7 @@ def get_dealers_by_state(url, state):
     results = []
     # Call get_request with the state param
     json_result = get_request(url, state=state)
-    dealers = json_result["body"]["docs"]
+    dealers = json_result
     # For each dealer in the response
     for dealer in dealers:
         # Create a CarDealer object with values in `doc` object
@@ -109,11 +111,12 @@ def get_dealers_by_state(url, state):
 def get_dealer_reviews_from_cf(url, dealer_id):
     results = []
     # Perform a GET request with the specified dealer id
-    json_result = get_request(url, dealerId=dealer_id)
+    json_result = get_request(url,"13dVXn-QWMy9nxIQGmSkUTszLcYXU_1vIxVEH_pqKiV2", dealerId=dealer_id)
 
     if json_result:
         # Get all review data from the response
-        reviews = json_result["body"]["data"]["docs"]
+        reviews = json_result
+        print(f"jsonresult {reviews}")
         # For every review in the response
         for review in reviews:
             # Create a DealerReview object from the data
@@ -157,6 +160,40 @@ def get_dealer_reviews_from_cf(url, dealer_id):
 # def analyze_review_sentiments(text):
 # - Call get_request() with specified arguments
 # - Get the returned sentiment label such as Positive or Negative
+# Calls the Watson NLU API and analyses the sentiment of a review
 
+
+
+def analyze_review_sentiments(review_text):
+    # Watson NLU configuration
+    try:
+        if os.environ['env_type'] == 'PRODUCTION':
+            url = "https://api.eu-gb.natural-language-understanding.watson.cloud.ibm.com/instances/15507446-de7f-40ea-9453-c6283bcec4e8"
+            api_key = "GZueUhI3oSPDLgVyrB0XwLeyii-Mh5BqJ4AKbDK_6QVq"
+    except KeyError:
+            url = "https://api.eu-gb.natural-language-understanding.watson.cloud.ibm.com/instances/15507446-de7f-40ea-9453-c6283bcec4e8"
+            api_key = "GZueUhI3oSPDLgVyrB0XwLeyii-Mh5BqJ4AKbDK_6QVq"
+
+    version = '2021-08-01'
+    authenticator = IAMAuthenticator(api_key)
+    nlu = NaturalLanguageUnderstandingV1(
+        version=version, authenticator=authenticator)
+    nlu.set_service_url(url)
+
+    # get sentiment of the review
+    try:
+        response = nlu.analyze(text=review_text, features=Features(
+            sentiment=SentimentOptions())).get_result()
+        print(json.dumps(response))
+        # sentiment_score = str(response["sentiment"]["document"]["score"])
+        sentiment_label = response["sentiment"]["document"]["label"]
+    except:
+        print("Review is too short for sentiment analysis. Assigning default sentiment value 'neutral' instead")
+        sentiment_label = "neutral"
+
+    # print(sentiment_score)
+    print(sentiment_label)
+
+    return sentiment_label
 
 
